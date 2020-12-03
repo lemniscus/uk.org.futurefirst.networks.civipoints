@@ -7,9 +7,9 @@
  * extension.
  */
 class CRM_Points_ExtensionUtil {
-  const SHORT_NAME = "civipoints";
-  const LONG_NAME = "uk.org.futurefirst.networks.civipoints";
-  const CLASS_PREFIX = "CRM_Points";
+  const SHORT_NAME = 'civipoints';
+  const LONG_NAME = 'uk.org.futurefirst.networks.civipoints';
+  const CLASS_PREFIX = 'CRM_Points';
 
   /**
    * Translate a string using the extension's domain.
