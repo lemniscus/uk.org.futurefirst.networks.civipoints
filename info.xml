@@ -14,8 +14,8 @@
     <author>David Knoll</author>
     <email>david@futurefirst.org.uk</email>
   </maintainer>
-  <releaseDate>2016-03-08</releaseDate>
-  <version>1.0</version>
+  <releaseDate>2020-12-06</releaseDate>
+  <version>1.2</version>
   <develStage>stable</develStage>
   <compatibility>
     <ver>5.14</ver>
@@ -33,6 +33,10 @@
     <ver>5.26</ver>
     <ver>5.27</ver>
     <ver>5.28</ver>
+    <ver>5.29</ver>
+    <ver>5.30</ver>
+    <ver>5.31</ver>
+    <ver>5.32</ver>
   </compatibility>
   <comments></comments>
   <civix>
