@@ -1,135 +1,107 @@
 <?php
 use CRM_Points_ExtensionUtil as E;
+use CRM_Points_Upgrader_CiviRulesEntity as PointsCiviRulesEntity;
 
 /**
  * Collection of upgrade steps.
  */
 class CRM_Points_Upgrader extends CRM_Points_Upgrader_Base {
 
-  // By convention, functions that look like "function upgrade_NNNN()" are
-  // upgrade tasks. They are executed in order (like Drupal's hook_update_N).
+  private function getOurCiviRulesEntities(): array {
+    return [
+        new PointsCiviRulesEntity('Action', [
+            'name' => 'civipoints_grant',
+            'label' => 'Grant points',
+            'class_name' => 'CRM_Points_CivirulesAction',
+            'is_active' => 1
+        ]),
+        new PointsCiviRulesEntity('Condition', [
+            'name'       => 'civipoints_getsum',
+            'label'      => 'Contact has points',
+            'class_name' => 'CRM_Points_CivirulesCondition',
+            'is_active'  => 1,
+        ])
+    ];
+  }
 
-  /**
-   * Example: Run an external SQL script when the module is installed.
-   *
   public function install() {
-    $this->executeSqlFile('sql/myinstall.sql');
   }
 
   /**
-   * Example: Work with entities usually not available during the install step.
-   *
-   * This method can be used for any post-install tasks. For example, if a step
-   * of your installation depends on accessing an entity that is itself
-   * created during the installation (e.g., a setting or a managed entity), do
-   * so here to avoid order of operation problems.
+   * @throws CiviCRM_API3_Exception
    */
-  // public function postInstall() {
-  //  $customFieldId = civicrm_api3('CustomField', 'getvalue', array(
-  //    'return' => array("id"),
-  //    'name' => "customFieldCreatedViaManagedHook",
-  //  ));
-  //  civicrm_api3('Setting', 'create', array(
-  //    'myWeirdFieldSetting' => array('id' => $customFieldId, 'weirdness' => 1),
-  //  ));
-  // }
+  private function installOurCiviRulesEntities() {
+    $ourCiviRulesEntities = $this->getOurCiviRulesEntities();
+    foreach ($ourCiviRulesEntities as $entity) {
+      if ($entity->missingFromDatabase()) $entity->saveInstallationValuesToDatabase();
+    }
+  }
 
   /**
-   * Example: Run an external SQL script when the module is uninstalled.
+   * @throws CiviCRM_API3_Exception
    */
-  // public function uninstall() {
-  //  $this->executeSqlFile('sql/myuninstall.sql');
-  // }
+  public function enable() {
+    $this->installOurCiviRulesEntities();
+    $this->removeWarningsFromCiviRulesDescriptions();
+  }
 
   /**
-   * Example: Run a simple query when a module is enabled.
+   * @throws CiviCRM_API3_Exception
    */
-  // public function enable() {
-  //  CRM_Core_DAO::executeQuery('UPDATE foo SET is_active = 1 WHERE bar = "whiz"');
-  // }
+  public function disable() {
+    $ourCiviRulesEntities = $this->getOurCiviRulesEntities();
+    foreach ($ourCiviRulesEntities as $entity) {
+      if ($entity->missingFromDatabase()) continue;
+      foreach ($entity->getConnectedRules() as $ruleParams) {
+        $this->disableRuleAndLeaveWarningInDescription($ruleParams);
+      }
+    }
+  }
 
   /**
-   * Example: Run a simple query when a module is disabled.
+   * @param $ruleParams
+   * @throws CiviCRM_API3_Exception
    */
-  // public function disable() {
-  //   CRM_Core_DAO::executeQuery('UPDATE foo SET is_active = 0 WHERE bar = "whiz"');
-  // }
+  private function disableRuleAndLeaveWarningInDescription($ruleParams) {
+    $description = $ruleParams['description'];
+    $descriptionFieldMaxLength = 256;
+    $warning = "WILL CAUSE ERRORS IF USED WITHOUT CIVIPOINTS EXTENSION ENABLED!";
+    if (!CRM_Utils_String::startsWith($description, $warning)) {
+      $description = CRM_Utils_String::ellipsify(trim("$warning $description"), $descriptionFieldMaxLength);
+    }
+    civicrm_api3('CiviRuleRule', 'create', [
+        'id' => $ruleParams['id'],
+        'is_active' => FALSE,
+        'description' => $description,
+    ]);
+  }
+
+  private function removeWarningsFromCiviRulesDescriptions() {
+    try {
+      $apiRuleResult = civicrm_api3('CiviRuleRule', 'get', []);
+      foreach ($apiRuleResult['values'] ?? [] as $ruleParams) {
+        $warning = "WILL CAUSE ERRORS IF USED WITHOUT CIVIPOINTS EXTENSION ENABLED!";
+        $description = trim(str_replace($warning, '', $ruleParams['description']));
+        civicrm_api3('CiviRuleRule', 'create', [
+            'id' => $ruleParams['id'],
+            'description' => $description,
+        ]);
+      }
+    } catch (CiviCRM_API3_Exception $e) {}
+  }
 
   /**
-   * Example: Run a couple simple queries.
-   *
-   * @return TRUE on success
-   * @throws Exception
    */
-  // public function upgrade_4200() {
-  //   $this->ctx->log->info('Applying update 4200');
-  //   CRM_Core_DAO::executeQuery('UPDATE foo SET bar = "whiz"');
-  //   CRM_Core_DAO::executeQuery('DELETE FROM bang WHERE willy = wonka(2)');
-  //   return TRUE;
-  // }
-
+  public function uninstall() {
+  }
 
   /**
-   * Example: Run an external SQL script.
-   *
-   * @return TRUE on success
-   * @throws Exception
+   * @throws CiviCRM_API3_Exception
    */
-  // public function upgrade_4201() {
-  //   $this->ctx->log->info('Applying update 4201');
-  //   // this path is relative to the extension base dir
-  //   $this->executeSqlFile('sql/upgrade_4201.sql');
-  //   return TRUE;
-  // }
-
-
-  /**
-   * Example: Run a slow upgrade process by breaking it up into smaller chunk.
-   *
-   * @return TRUE on success
-   * @throws Exception
-   */
-  // public function upgrade_4202() {
-  //   $this->ctx->log->info('Planning update 4202'); // PEAR Log interface
-
-  //   $this->addTask(E::ts('Process first step'), 'processPart1', $arg1, $arg2);
-  //   $this->addTask(E::ts('Process second step'), 'processPart2', $arg3, $arg4);
-  //   $this->addTask(E::ts('Process second step'), 'processPart3', $arg5);
-  //   return TRUE;
-  // }
-  // public function processPart1($arg1, $arg2) { sleep(10); return TRUE; }
-  // public function processPart2($arg3, $arg4) { sleep(10); return TRUE; }
-  // public function processPart3($arg5) { sleep(10); return TRUE; }
-
-  /**
-   * Example: Run an upgrade with a query that touches many (potentially
-   * millions) of records by breaking it up into smaller chunks.
-   *
-   * @return TRUE on success
-   * @throws Exception
-   */
-  // public function upgrade_4203() {
-  //   $this->ctx->log->info('Planning update 4203'); // PEAR Log interface
-
-  //   $minId = CRM_Core_DAO::singleValueQuery('SELECT coalesce(min(id),0) FROM civicrm_contribution');
-  //   $maxId = CRM_Core_DAO::singleValueQuery('SELECT coalesce(max(id),0) FROM civicrm_contribution');
-  //   for ($startId = $minId; $startId <= $maxId; $startId += self::BATCH_SIZE) {
-  //     $endId = $startId + self::BATCH_SIZE - 1;
-  //     $title = E::ts('Upgrade Batch (%1 => %2)', array(
-  //       1 => $startId,
-  //       2 => $endId,
-  //     ));
-  //     $sql = '
-  //       UPDATE civicrm_contribution SET foobar = whiz(wonky()+wanker)
-  //       WHERE id BETWEEN %1 and %2
-  //     ';
-  //     $params = array(
-  //       1 => array($startId, 'Integer'),
-  //       2 => array($endId, 'Integer'),
-  //     );
-  //     $this->addTask($title, 'executeSql', $sql, $params);
-  //   }
-  //   return TRUE;
-  // }
+  public function upgrade_1000(): bool {
+    $this->ctx->log->info('Installing any missing CiviPoints-related CiviRules conditions and actions');
+    $this->installOurCiviRulesEntities();
+    return TRUE;
+  }
 
 }
