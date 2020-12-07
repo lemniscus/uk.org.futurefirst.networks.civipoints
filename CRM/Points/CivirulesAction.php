@@ -43,7 +43,7 @@ class CRM_Points_CivirulesAction extends CRM_CivirulesActions_Generic_Api {
    */
   protected function alterApiParameters($parameters, CRM_Civirules_TriggerData_TriggerData $triggerData) {
     $parameters['contact_id'] = $triggerData->getContactId();
-
+    $parameters['grantor_contact_id'] = 1;
     $expiration_interval = $parameters['expiration_interval'] ?? FALSE;
     $expiration_unit = $parameters['expiration_unit'] ?? FALSE;
     if ($expiration_interval && $expiration_unit) {
